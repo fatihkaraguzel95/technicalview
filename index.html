@@ -530,9 +530,28 @@
    * Kod /api/me ile doğrulanır; geçerliyse saklanır. Bu kodların süresi uzun
    * olduğu için yenileme gerekmez (refresh_token yok).
    */
+  /**
+   * giris-al.js'in ürettiği paketi çözer.
+   *
+   * Paket, erişim ve yenileme anahtarını birlikte taşır; böylece telefon
+   * kimliği kendi kendine tazeler ve bilgisayara bir daha ihtiyaç kalmaz.
+   */
+  function paketCoz(metin){
+    if (metin.indexOf('claude-limit:') !== 0) return null;
+    try {
+      var gövde = metin.slice('claude-limit:'.length).replace(/-/g, '+').replace(/_/g, '/');
+      var p = JSON.parse(decodeURIComponent(escape(atob(gövde))));
+      if (!p.a) return null;
+      return { access_token: p.a, refresh_token: p.r || null, expires_at: p.e || null };
+    } catch (e) { return null; }
+  }
+
   function loginWithToken(){
     var tok = ($('tokIn').value || '').trim();
     if (!tok) return loginError('Önce kodu yapıştır.');
+
+    var paket = paketCoz(tok);
+    if (paket) tok = paket.access_token;
 
     loginError(null);
     $('tokBtn').textContent = 'Kontrol ediliyor...';
@@ -553,7 +572,8 @@
               'claude setup-token komutunu tekrar çalıştırıp yeni kod al.'
             : (res.j.message || 'Kod doğrulanamadı.'));
         }
-        auth = { access_token: tok, refresh_token: null, expires_at: null };
+        // Paketle gelindiyse yenileme anahtarı da saklanır: oturum kendini tazeler
+        auth = paket || { access_token: tok, refresh_token: null, expires_at: null };
         save(AUTH_KEY, auth);
         save(ME_KEY, res.j);
         $('tokIn').value = '';
