@@ -1,4 +1,4 @@
-# Claude Limit — web sürümü
+# Claude Limit
 
 Claude hesabının kalan limitini gösteren siyah panel. Vercel üzerinde çalışır:
 **bilgisayarın kapalı olabilir**, telefon mobil veride olabilir, panel yine çalışır.
@@ -18,6 +18,40 @@ Panelde:
 
 ---
 
+## Kurulum
+
+### 1. Vercel'e bağla
+
+1. [vercel.com](https://vercel.com) → GitHub hesabınla giriş yap
+2. **Add New → Project** → bu depoyu seç
+3. **Deploy**
+
+Hiçbir ayar değiştirmen gerekmez: uygulama deponun kökünde durur, `index.html` statik
+olarak servis edilir, `api/*.js` dosyaları sunucusuz fonksiyona dönüşür.
+
+> Daha önce bu projeyi oluşturup **Root Directory**'ye bir klasör adı yazdıysan onu
+> temizle (**Settings → General → Root Directory** → boş bırak / `./`), sonra
+> **Deployments → Redeploy**. Dolu kalırsa `404 NOT_FOUND` alırsın.
+
+### 2. Telefona kur
+
+1. Çıkan adresi (`https://....vercel.app`) Chrome'da aç
+2. **Claude ile giriş yap** → Claude'un onay sayfasında izin ver → çıkan kodu kopyala
+3. Kodu panele yapıştır
+4. Menü (⋮) → **Ana ekrana ekle**
+
+HTTPS olduğu için uygulama tam ekran açılır ve sayfa ekranı açık tutabilir.
+Başka cihaz eklemek için aynı adımlar — her cihaz kendi oturumunu tutar.
+
+### 3. Ekranı sürekli açık tutma
+
+Panel ekranı kendisi açık tutmaya çalışır (Wake Lock). Daha sağlam yöntem telefon ayarı:
+
+**Ayarlar → Telefon hakkında** → "Derleme numarası"na 7 kez dokun →
+**Ayarlar → Sistem → Geliştirici seçenekleri → "Şarj olurken ekran açık kalsın"** aç.
+
+---
+
 ## Mimari — token nerede duruyor?
 
 ```
@@ -31,40 +65,8 @@ Sunucu tarafı tamamen **durumsuz**: veritabanı yok, oturum yok, token kaydı y
 Token senin tarayıcının `localStorage`'ında durur ve her istekte `Authorization`
 başlığıyla gelir. Vercel fonksiyonu onu Anthropic'e iletir, sonucu döndürür ve unutur.
 
-Bunun pratik sonucu: **senin anahtarını kimse taşımıyor.** Panelin açık olması
-hesabına erişim vermez; tarayıcı verisini silmek çıkış yapmaya eşdeğerdir.
-
-## Kurulum
-
-### 1. Vercel'e bağla
-
-1. [vercel.com](https://vercel.com) → GitHub hesabınla giriş yap
-2. **Add New → Project** → bu depoyu seç
-3. **Root Directory**'yi `claude-limit-web` olarak ayarla (önemli — depoda başka
-   klasörler de var)
-4. Deploy
-
-Build ayarı gerekmez; `public/` statik olarak servis edilir, `api/*.js` dosyaları
-sunucusuz fonksiyon olur.
-
-### 2. Telefona kur
-
-1. Çıkan adresi (`https://....vercel.app`) Chrome'da aç
-2. **Claude ile giriş yap** → Claude'un onay sayfasında izin ver → çıkan kodu kopyala
-3. Kodu panele yapıştır
-4. Menü (⋮) → **Ana ekrana ekle**
-
-HTTPS olduğu için uygulama tam ekran açılır ve sayfa ekranı açık tutabilir.
-
-Başka bir cihaz eklemek için aynı adımlar — her cihaz kendi oturumunu tutar.
-
-### 3. Ekranı sürekli açık tutma
-
-Panel HTTPS üzerinden çalıştığı için ekranı kendisi açık tutmaya çalışır (Wake Lock).
-Daha sağlam yöntem, telefon ayarından:
-
-**Ayarlar → Telefon hakkında** → "Derleme numarası"na 7 kez dokun →
-**Ayarlar → Sistem → Geliştirici seçenekleri → "Şarj olurken ekran açık kalsın"** aç.
+Pratik sonucu: **senin anahtarını kimse taşımıyor.** Tarayıcı verisini silmek çıkış
+yapmaya eşdeğerdir.
 
 ## Gece modu
 
@@ -102,22 +104,25 @@ node dev-server.js        # http://localhost:3000
 ```
 
 Vercel'in `/api/*.js` fonksiyonlarını çalıştırma biçimini taklit eder; deploy etmeden
-değişiklik denemek için. Yayında kullanılmaz.
+değişiklik denemek için. Yayına dahil edilmez (`.vercelignore`).
 
 ## Dosyalar
 
 | Dosya | İş |
 |---|---|
-| `public/index.html` | Giriş ekranı + panel (arayüz ve mantığın tamamı) |
+| `index.html` | Giriş ekranı + panel (arayüz ve mantığın tamamı) |
 | `api/usage.js` | Kullanım yüzdeleri |
 | `api/me.js` | Giriş yapan hesabın adı/planı |
 | `api/token.js` | Giriş kodunu token'a çevirir |
 | `api/refresh.js` | Süresi dolan token'ı yeniler |
 | `api/_anthropic.js` | Ortak yardımcılar (alt çizgi ile başladığı için rota değil) |
+| `sw.js`, `manifest.webmanifest` | Ana ekrana eklenince uygulama gibi açılması |
+| `icon-*.png` | Siyah zeminde Claude işareti |
 | `dev-server.js` | Yerel test sunucusu |
-| `vercel.json` | `public/` statik, `api/` fonksiyon |
+| `claude-usage-monitor/` | Buluta çıkmadan, PC üzerinden çalışan ilk sürüm |
 
 ## Bilgisayar tabanlı sürüm
 
-Buluta hiç çıkmak istemiyorsan `../claude-usage-monitor` klasöründeki sürüm aynı paneli
-ev ağında, PC üzerinden servis eder. Giriş gerektirmez ama PC'nin açık olmasını ister.
+Buluta hiç çıkmak istemiyorsan `claude-usage-monitor/` klasöründeki sürüm aynı paneli ev
+ağında, PC üzerinden servis eder. Giriş gerektirmez ama PC'nin açık olmasını ister.
+Ayrıntılar o klasörün kendi README'sinde.

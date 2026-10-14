@@ -13,7 +13,8 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = Number(process.env.PORT || 3000);
-const PUBLIC_DIR = path.join(__dirname, 'public');
+// Statik dosyalar proje kökünde duruyor (Vercel de kökü servis ediyor)
+const PUBLIC_DIR = __dirname;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
