@@ -25,6 +25,7 @@ const TOKEN_URL = 'https://console.anthropic.com/v1/oauth/token';
 
 const LOG = path.join(__dirname, 'giris-log.txt');
 const OUT = path.join(__dirname, 'telefon-kodu.txt');
+const ACICI = path.join(__dirname, 'giris-ac.html');
 
 const log = [];
 function kaydet(satir) {
@@ -76,7 +77,22 @@ function sor(soru) {
   console.log('  Ardindan ekranda bir KOD cikacak, onu kopyala.');
   console.log('');
 
-  try { spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref(); } catch {}
+  // Adresi dogrudan "start" ile acmiyoruz: Windows kabugu URL'deki & isaretini
+  // komut ayirici sayip adresi ilk &'de kesiyor, client_id dusuyor.
+  // Bunun yerine adresi yerel bir HTML dosyasina yazip o dosyayi aciyoruz.
+  const kacir = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  fs.writeFileSync(ACICI,
+    '<!doctype html><meta charset="utf-8">' +
+    '<meta http-equiv="refresh" content="0;url=' + kacir(url) + '">' +
+    '<title>Claude girisi aciliyor</title>' +
+    '<body style="background:#000;color:#f5f3ef;font-family:system-ui;padding:40px">' +
+    '<p>Claude giris sayfasi aciliyor...</p>' +
+    '<p>Acilmazsa <a style="color:#d97757" href="' + kacir(url) + '">buraya tikla</a>.</p>'
+  );
+  kaydet('acici dosya yazildi: ' + ACICI);
+  if (!process.env.ACMA) {
+    try { spawn('explorer.exe', [ACICI], { detached: true, stdio: 'ignore' }).unref(); } catch {}
+  }
 
   const kod = await sor('  ADIM 2 — Kodu buraya yapistir ve Enter: ');
   if (!kod) { console.log('  Kod girilmedi, cikiliyor.'); return; }

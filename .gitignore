@@ -20,3 +20,8 @@ desktop.ini
 .env.*
 *token*.txt
 *secret*
+
+# giris-al.js ciktilari - KIMLIK ICERIR, asla commit edilmemeli
+telefon-kodu.txt
+giris-log.txt
+giris-ac.html
