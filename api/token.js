@@ -22,13 +22,18 @@ function readBody(req) {
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return send(res, 405, { ok: false, message: 'POST bekleniyor.' });
 
-  const { code, verifier, redirect_uri } = readBody(req);
+  const { code, verifier, redirect_uri, state } = readBody(req);
   if (!code || !verifier) {
     return send(res, 400, { ok: false, message: 'Kod veya doğrulayıcı eksik.' });
   }
 
-  // claude.ai kodu "KOD#STATE" biçiminde verebiliyor
-  const [rawCode, state] = String(code).trim().split('#');
+  // Kod "KOD#STATE" biçiminde gelebiliyor; gelmezse girişte saklanan state kullanılır.
+  // state'siz istek token ucundan "Invalid request format" ile dönüyor, bu yüzden şart.
+  const [rawCode, stateFromCode] = String(code).trim().split('#');
+  const effectiveState = stateFromCode || state;
+  if (!effectiveState) {
+    return send(res, 400, { ok: false, message: 'Giriş adımı eksik. Giriş sayfasını tekrar aç.' });
+  }
 
   try {
     const { status, json } = await exchange({
@@ -36,15 +41,19 @@ module.exports = async (req, res) => {
       code: rawCode,
       redirect_uri: redirect_uri || 'https://console.anthropic.com/oauth/code/callback',
       code_verifier: verifier,
-      state: state || undefined,
+      state: effectiveState,
     });
 
     if (status !== 200 || !json.access_token) {
-      const detay = json.error_description ? ' (' + json.error_description + ')' : '';
+      // İki hata biçimi dönebiliyor: OAuth tarzı {error, error_description}
+      // ve Anthropic tarzı {error: {type, message}}
+      const neden =
+        (json.error && json.error.message) || json.error_description ||
+        (typeof json.error === 'string' ? json.error : null);
       return send(res, 400, {
         ok: false,
-        code: json.error || 'EXCHANGE_FAILED',
-        message: KOD_HATASI + detay,
+        code: (json.error && json.error.type) || json.error || 'EXCHANGE_FAILED',
+        message: KOD_HATASI + (neden ? ' (' + neden + ')' : ''),
       });
     }
 

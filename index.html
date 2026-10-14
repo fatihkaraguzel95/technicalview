@@ -361,9 +361,11 @@
       .then(function(h){ return { verifier: verifier, challenge: b64url(h) }; });
   }
 
-  // Dar küme yetmezse tanı bölümündeki alternatif bağlantı geniş kümeyi dener
+  // Dar küme yetmezse tanı bölümündeki alternatif bağlantı geniş kümeyi dener.
+  // org:create_api_key bilerek yok: Anthropic artık o izni tanımıyor ve
+  // isteği "Unknown scope" ile reddediyor.
   var SCOPES_DAR   = 'user:profile user:inference';
-  var SCOPES_GENIS = 'org:create_api_key user:profile user:inference';
+  var SCOPES_GENIS = 'user:profile user:inference user:sessions:claude_code user:mcp_servers';
 
   /**
    * Yetkilendirme adresini elle kurar.
@@ -455,7 +457,10 @@
     fetch('/api/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: code, verifier: pk.verifier, redirect_uri: REDIRECT }),
+      // state şart: token ucu state'siz isteği "Invalid request format" ile reddediyor
+      body: JSON.stringify({
+        code: code, verifier: pk.verifier, state: pk.state, redirect_uri: REDIRECT,
+      }),
     })
       .then(function(r){ return r.json(); })
       .then(function(j){
