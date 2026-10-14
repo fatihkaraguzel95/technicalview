@@ -1,0 +1,7 @@
+{
+  "name": "claude-limit-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Claude oturum ve haftalik limitlerini gosteren siyah panel",
+  "engines": { "node": ">=18" }
+}
