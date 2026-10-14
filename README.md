@@ -33,27 +33,21 @@ olarak servis edilir, `api/*.js` dosyaları sunucusuz fonksiyona dönüşür.
 > temizle (**Settings → General → Root Directory** → boş bırak / `./`), sonra
 > **Deployments → Redeploy**. Dolu kalırsa `404 NOT_FOUND` alırsın.
 
-### 2. Giriş kodunu üret
-
-Bilgisayarında bir kez:
-
-```
-claude setup-token
-```
-
-Verdiği uzun kodu (`sk-ant-oat01-...`) kopyala. Bu kod uzun ömürlüdür; bir kez üretip
-bütün cihazlarda kullanabilirsin.
-
-### 3. Telefona kur
+### 2. Telefona kur
 
 1. Çıkan adresi (`https://....vercel.app`) Chrome'da aç
-2. Kodu yapıştır → **Giriş yap**
-3. Menü (⋮) → **Ana ekrana ekle**
+2. **Claude ile giriş yap** → Claude'un onay sayfasında izin ver → çıkan kodu kopyala
+3. Kodu panele yapıştır → **Giriş yap**
+4. Menü (⋮) → **Ana ekrana ekle**
+
+> **`claude setup-token` bu iş için kullanılamaz.** O komutun ürettiği kod yalnızca
+> Claude'a istek atmaya yarıyor; kullanım ve profil verisini okuyamıyor ve 403 döndürüyor.
+> Gerekli olan `user:profile` izni yalnızca yukarıdaki giriş akışından geliyor.
 
 HTTPS olduğu için uygulama tam ekran açılır ve sayfa ekranı açık tutabilir.
 Başka cihaz eklemek için aynı adımlar — her cihaz kendi oturumunu tutar.
 
-### 4. Ekranı sürekli açık tutma
+### 3. Ekranı sürekli açık tutma
 
 Panel ekranı kendisi açık tutmaya çalışır (Wake Lock). Daha sağlam yöntem telefon ayarı:
 

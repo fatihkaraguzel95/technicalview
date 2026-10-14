@@ -167,13 +167,13 @@
     background:#17171a; border:1px solid var(--line); border-radius:6px;
     padding:2px 6px; font-size:12.5px; color:var(--accent); white-space:nowrap;
   }
-  #oauthBox{border-top:1px solid var(--line); padding-top:6px; margin-top:4px}
-  #oauthBox>summary{
-    font-size:12.5px; color:var(--dim); cursor:pointer; padding:10px 0; list-style:none;
+  #tokenBox{border-top:1px solid var(--line); padding-top:6px; margin-top:4px}
+  #tokenBox>summary{
+    font-size:12.5px; color:var(--dimmer); cursor:pointer; padding:10px 0; list-style:none;
   }
-  #oauthBox>summary::-webkit-details-marker{display:none}
-  #oauthBox>summary::before{content:"› "}
-  #oauthBox[open]>summary::before{content:"⌄ "}
+  #tokenBox>summary::-webkit-details-marker{display:none}
+  #tokenBox>summary::before{content:"› "}
+  #tokenBox[open]>summary::before{content:"⌄ "}
   #loginErr{
     color:#f2c4c0; background:color-mix(in srgb,var(--bad) 14%,var(--card));
     border:1px solid color-mix(in srgb,var(--bad) 40%,transparent);
@@ -201,24 +201,6 @@
 <div id="login" class="hidden">
   <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="#d97757" class="markG"></g></svg>
   <h1>Claude Limit</h1>
-
-  <div id="tokenBox">
-    <p style="margin-bottom:16px">
-      Bilgisayarında bir kez <code class="inline">claude setup-token</code> çalıştır,
-      verdiği uzun kodu buraya yapıştır. Hangi hesabın kodu yapıştırılırsa
-      <b>o hesabın</b> verileri gösterilir.
-    </p>
-    <input id="tokIn" type="text" inputmode="text" autocomplete="off"
-           autocapitalize="off" spellcheck="false" placeholder="sk-ant-oat01-...">
-    <button class="cta" id="tokBtn" style="margin-top:12px">Giriş yap</button>
-    <p class="note" style="margin-top:14px">
-      Kod yalnızca bu cihazın tarayıcısında saklanır, sunucuya kaydedilmez.
-      Çıkış yapmak onu silmeye eşdeğerdir.
-    </p>
-  </div>
-
-  <details id="oauthBox">
-    <summary>Bunun yerine Claude hesabıyla giriş yap</summary>
 
   <div id="step1">
     <p style="margin-bottom:18px">
@@ -259,6 +241,16 @@
     <code id="rawUrl"></code>
   </details>
 
+  <details id="tokenBox">
+    <summary>Gelişmiş: token yapıştırarak gir</summary>
+    <p class="note" style="margin:10px 0">
+      Profil okuma izni olan bir token'ın varsa buraya yapıştırabilirsin.
+      <code class="inline">claude setup-token</code> ile üretilen kodlar bu iş için
+      <b>uygun değil</b>: kullanım ve profil verisini okuyamıyor, 403 veriyorlar.
+    </p>
+    <input id="tokIn" type="text" inputmode="text" autocomplete="off"
+           autocapitalize="off" spellcheck="false" placeholder="token">
+    <button class="cta ghost" id="tokBtn" style="margin-top:10px">Token ile gir</button>
   </details>
 
   <div id="loginErr" class="hidden"></div>
@@ -373,7 +365,9 @@
   var ME_KEY   = 'claudeLimit.me';
   var PK_KEY   = 'claudeLimit.pkce';
   var CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
-  var REDIRECT  = 'https://console.anthropic.com/oauth/code/callback';
+  // Güncel Claude Code bu dönüş adresini kullanıyor; token takasındaki adresle
+  // birebir aynı olmak zorunda
+  var REDIRECT  = 'https://platform.claude.com/oauth/code/callback';
 
   /**
    * Tarayıcıdan kalıcı depolama izni ister.
@@ -479,13 +473,15 @@
     return makePkce().then(function(pk){
       var state = b64url(crypto.getRandomValues(new Uint8Array(16)));
       save(PK_KEY, { verifier: pk.verifier, state: state });
-      var url = authorizeUrl(pk, state, SCOPES_DAR);
+      // Asıl bağlantı Claude Code'un izin kümesini birebir kullanır; profil
+      // okuma izni buradan geliyor (setup-token kodlarında o izin yok).
+      var url = authorizeUrl(pk, state, SCOPES_GENIS);
       $('startBtn').href = url;
       $('againBtn').href = url;
       $('rawUrl').textContent = url;
-      // Aynı doğrulayıcı, geniş izin kümesi — iki bağlantıdan hangisi açılırsa
-      // yapıştırılan kod yine geçerli olur
-      $('altBtn').href = authorizeUrl(pk, state, SCOPES_GENIS);
+      // Aynı doğrulayıcı, dar izin kümesi — hangisiyle girilirse girilsin
+      // yapıştırılan kod geçerli olur
+      $('altBtn').href = authorizeUrl(pk, state, SCOPES_DAR);
     }).catch(function(){
       loginError('Tarayıcı, güvenli bağlantı gerektiren bir özelliği engelledi. ' +
                  'Sayfayı https:// ile açtığından emin ol.');

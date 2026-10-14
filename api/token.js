@@ -39,7 +39,7 @@ module.exports = async (req, res) => {
     const { status, json } = await exchange({
       grant_type: 'authorization_code',
       code: rawCode,
-      redirect_uri: redirect_uri || 'https://console.anthropic.com/oauth/code/callback',
+      redirect_uri: redirect_uri || 'https://platform.claude.com/oauth/code/callback',
       code_verifier: verifier,
       state: effectiveState,
     });
