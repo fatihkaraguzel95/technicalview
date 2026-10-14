@@ -1,0 +1,22 @@
+# Claude Code yerel ayarlari (makineye ozel, paylasilmaz)
+.claude/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Loglar ve gecici dosyalar
+*.log
+__pycache__/
+
+# Isletim sistemi
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ASLA commit edilmemeli
+.credentials.json
+.env
+.env.*
+*token*.txt
+*secret*

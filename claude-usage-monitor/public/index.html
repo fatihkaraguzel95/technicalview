@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Claude Limit</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root{
+    --bg:#000; --card:#0f0f10; --line:#1f1f22;
+    --txt:#f5f3ef; --dim:#8a8780; --dimmer:#55534e;
+    --accent:#d97757; --good:#4ba36a; --warn:#d9a13f; --bad:#d9574f;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0; background:var(--bg); color:var(--txt)}
+  body{
+    font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,system-ui,sans-serif;
+    min-height:100vh; min-height:100dvh;
+    overscroll-behavior:none;
+  }
+  .num{font-variant-numeric:tabular-nums; font-feature-settings:"tnum"}
+
+  /* içerik sarmalayıcı — burn-in için yavaşça kayar */
+  #wrap{
+    min-height:100vh; min-height:100dvh;
+    padding:max(18px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom));
+    display:flex; flex-direction:column; justify-content:center; gap:14px;
+    max-width:520px; margin:0 auto;
+    transition:transform 4s ease-in-out;
+  }
+
+  /* ---- başlık ---- */
+  header{display:flex; align-items:center; gap:10px}
+  header svg{width:26px; height:26px; flex:none}
+  .brand{font-size:15px; font-weight:600; letter-spacing:.01em}
+  .plan{
+    font-size:10px; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--accent); border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);
+    padding:3px 7px; border-radius:999px;
+  }
+  .live{margin-left:auto; display:flex; align-items:center; gap:6px; font-size:11px; color:var(--dimmer)}
+  .dot{width:6px; height:6px; border-radius:50%; background:var(--good); flex:none}
+  .dot.stale{background:var(--warn)}
+  .dot.err{background:var(--bad)}
+  body.fresh .dot{animation:ping .9s ease-out}
+  @keyframes ping{
+    from{box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 70%,transparent)}
+    to{box-shadow:0 0 0 9px transparent}
+  }
+
+  /* ---- kartlar ---- */
+  .card{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:18px}
+  .lbl{font-size:10px; font-weight:700; letter-spacing:.11em; text-transform:uppercase; color:var(--dim)}
+
+  /* ---- halka ---- */
+  .ring-card{display:flex; flex-direction:column; align-items:center; gap:2px; padding:22px 18px 18px}
+  .ring{position:relative; width:220px; height:220px; margin:4px 0 2px}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .track{stroke:#1c1c1f}
+  .ring .val{transition:stroke-dashoffset .7s cubic-bezier(.3,.8,.3,1), stroke .4s}
+  .ring-mid{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center}
+  .big{font-size:60px; font-weight:700; line-height:1; letter-spacing:-.03em}
+  .big span{font-size:24px; font-weight:600; color:var(--dim); margin-left:2px}
+  .big-sub{font-size:11px; color:var(--dim); margin-top:7px; letter-spacing:.06em}
+  .reset{margin-top:10px; text-align:center; font-size:13px; color:var(--dim)}
+  .reset b{color:var(--txt); font-weight:600}
+
+  /* ---- bar satırları ---- */
+  .row{display:flex; align-items:baseline; justify-content:space-between; gap:10px}
+  .row .pct{font-size:30px; font-weight:700; letter-spacing:-.02em; line-height:1}
+  .row .pct span{font-size:15px; font-weight:600; color:var(--dim)}
+  .bar{height:8px; border-radius:99px; background:#1c1c1f; overflow:hidden; margin:13px 0 11px}
+  .bar>i{display:block; height:100%; border-radius:99px; transition:width .7s cubic-bezier(.3,.8,.3,1), background .4s}
+  .meta{display:flex; justify-content:space-between; font-size:12px; color:var(--dim); gap:10px}
+  .meta b{color:var(--txt); font-weight:600}
+
+  /* ---- dağılım ---- */
+  .seg{display:flex; height:8px; border-radius:99px; overflow:hidden; background:#1c1c1f; margin:13px 0 12px; gap:2px}
+  .seg>i{height:100%; transition:width .6s ease}
+  .keys{display:flex; flex-wrap:wrap; gap:7px 15px}
+  .key{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--dim)}
+  .key i{width:7px; height:7px; border-radius:2px; flex:none}
+  .key b{color:var(--txt); font-weight:600}
+
+  /* ---- alt bar ---- */
+  footer{margin-top:8px; display:flex; align-items:center; gap:8px; padding:2px 4px; font-size:11px; color:var(--dimmer)}
+  .btn{
+    background:transparent; border:1px solid var(--line); color:var(--dim);
+    font:inherit; font-size:11px; padding:6px 11px; border-radius:9px; cursor:pointer;
+  }
+  .btn:active{background:#17171a}
+  .btn.on{color:var(--accent); border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
+  footer .btn:first-of-type{margin-left:auto}
+
+  .banner{
+    display:none; background:color-mix(in srgb,var(--bad) 14%,var(--card));
+    border:1px solid color-mix(in srgb,var(--bad) 40%,transparent);
+    color:#f2c4c0; border-radius:13px; padding:11px 14px; font-size:12.5px; line-height:1.45;
+  }
+  .banner.on{display:block}
+  .skeleton #wrap{opacity:.35}
+
+  /* ---- gece modu ayarları ---- */
+  #cfg{display:none; font-size:12.5px; color:var(--dim)}
+  #cfg.on{display:block}
+  #cfg label{display:flex; align-items:center; gap:9px; padding:7px 0}
+  #cfg input[type=time]{
+    background:#17171a; border:1px solid var(--line); color:var(--txt);
+    font:inherit; padding:5px 8px; border-radius:8px; color-scheme:dark;
+  }
+  #cfg input[type=checkbox]{accent-color:var(--accent); width:16px; height:16px}
+  #cfg .hint{color:var(--dimmer); font-size:11.5px; line-height:1.5; margin-top:8px}
+
+  /* ---- gece perdesi ---- */
+  #night{
+    position:fixed; inset:0; background:#000; z-index:50;
+    opacity:0; pointer-events:none; transition:opacity 1.4s ease;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #night.on{opacity:1; pointer-events:auto}
+  #nclock{
+    font-size:54px; font-weight:300; letter-spacing:.02em; color:#1e1e1f;
+    transition:transform 6s ease-in-out;
+  }
+</style>
+</head>
+<body class="skeleton">
+
+<div id="wrap">
+
+  <header>
+    <svg viewBox="0 0 100 100" aria-hidden="true"><g fill="#d97757" id="mark"></g></svg>
+    <div class="brand">Claude</div>
+    <div class="plan" id="plan">PRO</div>
+    <div class="live"><span class="dot" id="dot"></span><span id="liveTxt">bağlanıyor</span></div>
+  </header>
+
+  <div class="banner" id="banner"></div>
+
+  <!-- OTURUM LİMİTİ -->
+  <div class="card ring-card">
+    <div class="lbl">Oturum limiti &middot; 5 saatlik</div>
+    <div class="ring">
+      <svg viewBox="0 0 220 220" width="220" height="220">
+        <circle class="track" cx="110" cy="110" r="96" fill="none" stroke-width="13"/>
+        <circle class="val" id="ring" cx="110" cy="110" r="96" fill="none" stroke-width="13"
+                stroke-linecap="round" stroke="#4ba36a"
+                stroke-dasharray="603.19" stroke-dashoffset="603.19"/>
+      </svg>
+      <div class="ring-mid">
+        <div class="big num"><em id="sPct" style="font-style:normal">--</em><span>%</span></div>
+        <div class="big-sub">KALAN</div>
+      </div>
+    </div>
+    <div class="reset">Yenilenme <b class="num" id="sIn">--</b> &middot; <span class="num" id="sAt">--</span></div>
+  </div>
+
+  <!-- HAFTALIK LİMİT -->
+  <div class="card">
+    <div class="row">
+      <div class="lbl">Haftalık limit</div>
+      <div class="pct num"><em id="wPct" style="font-style:normal">--</em><span>% kalan</span></div>
+    </div>
+    <div class="bar"><i id="wBar" style="width:0%"></i></div>
+    <div class="meta">
+      <span>Yenilenme <b class="num" id="wIn">--</b></span>
+      <span class="num" id="wAt">--</span>
+    </div>
+  </div>
+
+  <!-- DAĞILIM -->
+  <div class="card" id="bdCard">
+    <div class="lbl">Haftalık kullanım dağılımı</div>
+    <div class="seg" id="seg"></div>
+    <div class="keys" id="keys"></div>
+  </div>
+
+  <!-- GECE MODU AYARLARI -->
+  <div class="card" id="cfg">
+    <div class="lbl" style="margin-bottom:6px">Gece modu</div>
+    <label><input type="checkbox" id="nOn"> Belirlenen saatlerde ekranı karart</label>
+    <label>
+      <input type="time" id="nFrom"> başlar
+      <input type="time" id="nTo"> biter
+    </label>
+    <label><input type="checkbox" id="nSleep"> Gece ekran tamamen uyusun</label>
+    <div class="hint">
+      Karartma sırasında ekran teknik olarak açık kalır ama sayfa tamamen siyah olur —
+      OLED ekranda kapalıya eşdeğerdir ve sabah kendiliğinden geri gelir.
+      Perdeye dokununca panel 15 saniye görünür.<br><br>
+      "Tamamen uyusun" seçilirse ekran gerçekten kapanır, ancak sayfa onu sabah geri
+      açamaz: bitiş saatinde ekrana bir kez dokunman gerekir.
+    </div>
+  </div>
+
+  <footer>
+    <span id="upd">--</span>
+    <button class="btn" id="cfgBtn">Gece modu</button>
+    <button class="btn" id="fsBtn">Tam ekran</button>
+  </footer>
+
+</div>
+
+<div id="night"><div id="nclock" class="num">--:--</div></div>
+
+<script>
+(function(){
+  "use strict";
+
+  // Claude işareti: merkezden çıkan, uzunluğu değişen ışın demeti
+  (function buildMark(){
+    var g = document.getElementById('mark'), n = 11, html = '';
+    for (var i = 0; i < n; i++) {
+      var a   = (360 / n) * i;
+      var len = (i % 2 === 0) ? 40 : 31;
+      var w   = (i % 2 === 0) ? 5.4 : 4.2;
+      html += '<rect x="' + (50 - w / 2) + '" y="' + (50 - len) + '" width="' + w +
+              '" height="' + len + '" rx="' + (w / 2) +
+              '" transform="rotate(' + a + ' 50 50)"/>';
+    }
+    g.innerHTML = html;
+  })();
+
+  var CIRC = 2 * Math.PI * 96;   // halka çevresi
+  var POLL_DAY = 30000;          // gündüz: 30 saniye
+  var POLL_NIGHT = 300000;       // gece: 5 dakika (pil ve istek tasarrufu)
+  var SEG_COLORS = ['#d97757', '#6a8fd9', '#4ba36a', '#b06ad9', '#d9a13f', '#59b0b5'];
+  var PEEK_MS = 15000;           // perdeye dokununca panelin görüneceği süre
+
+  var $ = function(id){ return document.getElementById(id); };
+  var css = function(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  };
+
+  var last = null;               // son başarılı veri
+  var lastOkAt = 0;
+  var peekUntil = 0;
+  var pollTimer = null;
+
+  /* ---------------- gece modu ayarları ---------------- */
+
+  var CFG_KEY = 'claudeLimit.night';
+  var cfg = { on: true, from: '00:00', to: '09:00', sleep: false };
+  try {
+    var saved = JSON.parse(localStorage.getItem(CFG_KEY) || 'null');
+    if (saved) cfg = Object.assign(cfg, saved);
+  } catch (e) {}
+
+  function saveCfg(){
+    cfg.on    = $('nOn').checked;
+    cfg.from  = $('nFrom').value || '00:00';
+    cfg.to    = $('nTo').value || '09:00';
+    cfg.sleep = $('nSleep').checked;
+    try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) {}
+    applyNight(true);
+  }
+
+  function fillCfg(){
+    $('nOn').checked = cfg.on;
+    $('nFrom').value = cfg.from;
+    $('nTo').value = cfg.to;
+    $('nSleep').checked = cfg.sleep;
+  }
+
+  function hm(s){
+    var p = String(s).split(':');
+    return (Number(p[0]) || 0) * 60 + (Number(p[1]) || 0);
+  }
+
+  function isNightNow(){
+    if (!cfg.on) return false;
+    var d = new Date();
+    var n = d.getHours() * 60 + d.getMinutes();
+    var f = hm(cfg.from), t = hm(cfg.to);
+    if (f === t) return false;
+    return f < t ? (n >= f && n < t) : (n >= f || n < t);
+  }
+
+  /* ---------------- ekranı açık tutma (Wake Lock) ---------------- */
+  /* Tarayıcı bu izni yalnızca HTTPS'te veriyor; http'de sessizce atlanır. */
+
+  var wakeLock = null;
+  var wakePending = false;
+
+  function acquireWake(){
+    if (!('wakeLock' in navigator) || wakeLock || wakePending) return;
+    wakePending = true;
+    navigator.wakeLock.request('screen').then(function(wl){
+      wakePending = false;
+      wakeLock = wl;
+      wl.addEventListener('release', function(){ wakeLock = null; });
+    }).catch(function(){ wakePending = false; });
+  }
+
+  function releaseWake(){
+    if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+  }
+
+  function syncWake(){
+    // Gece "tamamen uyusun" seçiliyse kilidi bırak, ekran normal zaman aşımıyla kapansın.
+    if (cfg.sleep && isNightNow() && Date.now() > peekUntil) releaseWake();
+    else acquireWake();
+  }
+
+  /* ---------------- gece perdesi ---------------- */
+
+  function applyNight(immediate){
+    var night = isNightNow() && Date.now() > peekUntil;
+    $('night').classList.toggle('on', night);
+    if (night) {
+      $('nclock').textContent = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    }
+    syncWake();
+    // Veri çekme sıklığını gündüz/gece durumuna göre ayarla
+    var want = night ? POLL_NIGHT : POLL_DAY;
+    if (pollTimer !== want || immediate) {
+      pollTimer = want;
+      clearInterval(applyNight._iv);
+      applyNight._iv = setInterval(poll, want);
+    }
+  }
+
+  $('night').addEventListener('click', function(){
+    peekUntil = Date.now() + PEEK_MS;
+    applyNight(true);
+    poll();
+  });
+
+  /* ---------------- burn-in kayması ---------------- */
+  /* Sabit duran halka ve yazılar OLED'de iz bırakmasın diye içerik
+     dakikada birkaç piksel kayar; gözle fark edilmez. */
+
+  function drift(){
+    var t = Date.now() / 60000;
+    var x = Math.round(Math.sin(t) * 3);
+    var y = Math.round(Math.cos(t * 0.7) * 3);
+    $('wrap').style.transform = 'translate(' + x + 'px,' + y + 'px)';
+    $('nclock').style.transform = 'translate(' + (-x * 4) + 'px,' + (y * 5) + 'px)';
+  }
+
+  /* ---------------- veri ---------------- */
+
+  function colorFor(remaining){
+    if (remaining <= 10) return css('--bad');
+    if (remaining <= 30) return css('--warn');
+    return css('--good');
+  }
+
+  function fmtClock(iso){
+    if (!iso) return '--';
+    var d = new Date(iso);
+    var t = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    if (d.toDateString() === new Date().toDateString()) return t;
+    return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }) + ' ' + t;
+  }
+
+  function fmtIn(iso){
+    if (!iso) return '--';
+    var ms = new Date(iso) - Date.now();
+    if (ms <= 0) return 'şimdi';
+    var m = Math.floor(ms / 60000), h = Math.floor(m / 60), d = Math.floor(h / 24);
+    if (d >= 1) return d + 'g ' + (h % 24) + 'sa sonra';
+    if (h >= 1) return h + 'sa ' + (m % 60) + 'dk sonra';
+    return m + 'dk sonra';
+  }
+
+  function render(d){
+    document.body.classList.remove('skeleton');
+    $('plan').textContent = (d.plan || 'pro').toUpperCase();
+
+    // Oturum halkası — kalan yüzde
+    var sRem = Math.max(0, 100 - (d.session ? d.session.percent : 0));
+    $('sPct').textContent = sRem;
+    var ring = $('ring');
+    ring.setAttribute('stroke-dashoffset', String(CIRC * (1 - sRem / 100)));
+    ring.setAttribute('stroke', colorFor(sRem));
+
+    // Haftalık — kalan yüzde
+    var wRem = Math.max(0, 100 - (d.weekly ? d.weekly.percent : 0));
+    $('wPct').textContent = wRem;
+    var wb = $('wBar');
+    wb.style.width = wRem + '%';
+    wb.style.background = colorFor(wRem);
+
+    // Hangi üründe ne kadar harcanmış
+    var rows = d.breakdown || [];
+    if (rows.length) {
+      $('bdCard').style.display = '';
+      var total = rows.reduce(function(a, r){ return a + r.percent; }, 0) || 1;
+      $('seg').innerHTML = rows.map(function(r, i){
+        return '<i style="width:' + (r.percent / total * 100) + '%;background:' +
+               SEG_COLORS[i % SEG_COLORS.length] + '"></i>';
+      }).join('');
+      $('keys').innerHTML = rows.map(function(r, i){
+        return '<span class="key"><i style="background:' + SEG_COLORS[i % SEG_COLORS.length] + '"></i>' +
+               r.name + ' <b class="num">' + r.percent + '%</b></span>';
+      }).join('');
+    } else {
+      $('bdCard').style.display = 'none';
+    }
+
+    tick();
+  }
+
+  // Saniyede bir: geri sayımlar, tazelik göstergesi, gece perdesi
+  function tick(){
+    if (last) {
+      if (last.session) {
+        $('sIn').textContent = fmtIn(last.session.resets_at);
+        $('sAt').textContent = fmtClock(last.session.resets_at);
+      }
+      if (last.weekly) {
+        $('wIn').textContent = fmtIn(last.weekly.resets_at);
+        $('wAt').textContent = fmtClock(last.weekly.resets_at);
+      }
+
+      var age = Math.round((Date.now() - lastOkAt) / 1000);
+      $('upd').textContent = 'Güncellendi ' +
+        (age < 60 ? age + ' sn önce' : Math.floor(age / 60) + ' dk önce');
+
+      if (!$('banner').classList.contains('on')) {
+        var stale = age > (isNightNow() ? 420 : 90);
+        $('dot').className = 'dot' + (stale ? ' stale' : '');
+        $('liveTxt').textContent = stale ? 'eski veri' : 'canlı';
+      }
+    }
+    applyNight(false);
+  }
+
+  function showError(msg){
+    var b = $('banner');
+    b.textContent = msg;
+    b.classList.add('on');
+    $('dot').className = 'dot err';
+    $('liveTxt').textContent = 'hata';
+  }
+
+  function poll(){
+    fetch('api/usage?t=' + Date.now(), { cache: 'no-store' })
+      .then(function(r){ return r.json().then(function(j){ return { r: r, j: j }; }); })
+      .then(function(res){
+        if (!res.r.ok || !res.j.ok) {
+          showError(res.j.message || ('Sunucu hatası ' + res.r.status));
+          return;
+        }
+        $('banner').classList.remove('on');
+        last = res.j;
+        lastOkAt = Date.now();
+        render(res.j);
+        document.body.classList.add('fresh');
+        setTimeout(function(){ document.body.classList.remove('fresh'); }, 950);
+      })
+      .catch(function(){
+        showError('Sunucuya ulaşılamıyor. PC açık ve aynı Wi-Fi ağında mı?');
+      });
+  }
+
+  /* ---------------- bağlama ---------------- */
+
+  fillCfg();
+  ['nOn', 'nFrom', 'nTo', 'nSleep'].forEach(function(id){
+    $(id).addEventListener('change', saveCfg);
+  });
+
+  $('cfgBtn').addEventListener('click', function(){
+    var open = $('cfg').classList.toggle('on');
+    this.classList.toggle('on', open);
+  });
+
+  $('fsBtn').addEventListener('click', function(){
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+  });
+
+  setInterval(tick, 1000);
+  setInterval(drift, 60000);
+  drift();
+  applyNight(true);
+  poll();
+
+  // Ekrana geri dönünce hemen tazele ve kilidi geri al
+  document.addEventListener('visibilitychange', function(){
+    if (!document.hidden) { syncWake(); poll(); }
+  });
+  document.addEventListener('click', syncWake, { once: true });
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  }
+})();
+</script>
+</body>
+</html>
