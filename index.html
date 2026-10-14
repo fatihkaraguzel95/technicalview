@@ -375,6 +375,20 @@
   var CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
   var REDIRECT  = 'https://console.anthropic.com/oauth/code/callback';
 
+  /**
+   * Tarayıcıdan kalıcı depolama izni ister.
+   *
+   * İzin verilmezse tarayıcı, yer darlığında site verisini silebilir ve
+   * giriş kodu kaybolur. İzinli sitelerde veri silinmez.
+   */
+  function persistStorage(){
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persisted().then(function(ok){
+        if (!ok) navigator.storage.persist().catch(function(){});
+      }).catch(function(){});
+    }
+  }
+
   function load(k){ try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
   function save(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   function drop(k){ try { localStorage.removeItem(k); } catch (e) {} }
@@ -447,6 +461,7 @@
   function showPanel(){
     $('login').classList.add('hidden');
     $('wrap').classList.remove('hidden');
+    persistStorage();
     // Hesap bilgisi yoksa (ör. giriş sırasında alınamadıysa) bir kez daha dene
     if (!fillMe() && auth) fetchMe().then(fillMe);
     applyNight(true);
@@ -804,9 +819,17 @@
       .then(function(r){ return r.json().then(function(j){ return { r: r, j: j }; }); })
       .then(function(res){
         if (res.r.status === 401) {
-          // Token beklenmedik şekilde geçersiz: bir kez yenilemeyi dene
-          if (auth && auth.refresh_token) { auth.expires_at = 0; save(AUTH_KEY, auth); }
-          else logout();
+          if (auth && auth.refresh_token) {
+            // Yenilenebilir oturum: sonraki turda yenilensin
+            auth.expires_at = 0;
+            save(AUTH_KEY, auth);
+          } else {
+            // Kodu burada SİLMİYORUZ. Geçici bir 401 yüzünden oturumu atmak,
+            // günlerce açık duran bir panelde kodu yeniden yapıştırmayı gerektirirdi.
+            showError('Giriş kodu şu an kabul edilmiyor. Geçici bir sorun olabilir; ' +
+                      'panel denemeyi sürdürüyor. Sürerse bilgisayarda ' +
+                      'claude setup-token ile yeni kod alıp Ayarlar → Çıkış deyip tekrar gir.');
+          }
           return;
         }
         if (!res.r.ok || !res.j.ok) {
