@@ -167,6 +167,19 @@
     border-radius:12px; padding:11px 13px; font-size:12.5px; line-height:1.5;
   }
   .note{font-size:11.5px; line-height:1.6; color:var(--dimmer)}
+  #diag{margin-top:4px}
+  #diag summary{
+    font-size:12px; color:var(--dimmer); cursor:pointer; padding:6px 0;
+    list-style:none;
+  }
+  #diag summary::-webkit-details-marker{display:none}
+  #diag summary::before{content:"› "; }
+  #diag[open] summary::before{content:"⌄ "}
+  #rawUrl{
+    display:block; background:#17171a; border:1px solid var(--line); border-radius:10px;
+    padding:11px; font-size:10.5px; line-height:1.5; color:var(--dim);
+    word-break:break-all; user-select:all; -webkit-user-select:all;
+  }
 </style>
 </head>
 <body class="skeleton">
@@ -181,7 +194,7 @@
       Kalan oturum ve haftalık limitini görmek için Claude hesabınla giriş yap.
       Hangi hesapla girersen o hesabın verileri gösterilir.
     </p>
-    <button class="cta" id="startBtn">Claude ile giriş yap</button>
+    <a class="cta" id="startBtn" target="_blank" rel="noopener">Claude ile giriş yap</a>
     <p class="note" style="margin-top:14px">
       Giriş, Claude'un kendi onay sayfasında yapılır. Şifren buraya hiç girilmez ve
       sunucuda hiçbir bilgi saklanmaz — oturum yalnızca bu cihazın tarayıcısında tutulur.
@@ -197,8 +210,19 @@
     <input id="codeIn" type="text" inputmode="text" autocomplete="off"
            autocapitalize="off" spellcheck="false" placeholder="Kodu buraya yapıştır">
     <button class="cta" id="doneBtn" style="margin-top:12px">Giriş yap</button>
-    <button class="cta ghost" id="againBtn" style="margin-top:9px">Claude sayfasını tekrar aç</button>
+    <a class="cta ghost" id="againBtn" target="_blank" rel="noopener"
+       style="margin-top:9px">Claude sayfasını tekrar aç</a>
   </div>
+
+  <details id="diag">
+    <summary>Sayfa açılmıyor mu?</summary>
+    <p class="note" style="margin:10px 0">
+      Butona bastığında yeni sekme açılmıyorsa tarayıcı engellemiş olabilir.
+      Aşağıdaki adresi kopyalayıp doğrudan aç — aynı işi görür.
+      Claude bir hata gösterirse o hatayı aynen bildir.
+    </p>
+    <code id="rawUrl"></code>
+  </details>
 
   <div id="loginErr" class="hidden"></div>
 </div>
@@ -376,16 +400,24 @@
     poll();
   }
 
-  function startLogin(){
-    loginError(null);
-    makePkce().then(function(pk){
+  /**
+   * Giriş adresini sayfa açılırken hazırlar.
+   *
+   * Butonun gerçek bir bağlantı olması şart: adres dokunuşun hemen ardından
+   * değil de bir async işlemden sonra açılırsa mobil tarayıcılar bunu açılır
+   * pencere sayıp engelliyor — buton basılıyor ama hiçbir şey olmuyordu.
+   */
+  function prepareAuth(){
+    return makePkce().then(function(pk){
       var state = b64url(crypto.getRandomValues(new Uint8Array(16)));
       save(PK_KEY, { verifier: pk.verifier, state: state });
-      $('step1').classList.add('hidden');
-      $('step2').classList.remove('hidden');
-      window.open(authorizeUrl(pk, state), '_blank', 'noopener');
+      var url = authorizeUrl(pk, state);
+      $('startBtn').href = url;
+      $('againBtn').href = url;
+      $('rawUrl').textContent = url;
     }).catch(function(){
-      loginError('Tarayıcı güvenli bağlantı gerektiren bir özelliği engelledi. Sayfayı https:// ile açtığından emin ol.');
+      loginError('Tarayıcı, güvenli bağlantı gerektiren bir özelliği engelledi. ' +
+                 'Sayfayı https:// ile açtığından emin ol.');
     });
   }
 
@@ -437,6 +469,7 @@
     $('step1').classList.remove('hidden');
     loginError(null);
     showLogin();
+    prepareAuth();   // sonraki giriş için taze kod doğrulayıcısı
   }
 
   /** Erişim token'ı dolmuşsa yeniler. Yenilenemezse girişe döner. */
@@ -700,9 +733,12 @@
     $(id).addEventListener('change', saveCfg);
   });
 
-  $('startBtn').addEventListener('click', startLogin);
+  // Bağlantılar sekmeyi kendileri açıyor; buradaki iş sadece 2. adımı göstermek
+  $('startBtn').addEventListener('click', function(){
+    $('step1').classList.add('hidden');
+    $('step2').classList.remove('hidden');
+  });
   $('doneBtn').addEventListener('click', finishLogin);
-  $('againBtn').addEventListener('click', startLogin);
   $('codeIn').addEventListener('keydown', function(e){ if (e.key === 'Enter') finishLogin(); });
   $('outBtn').addEventListener('click', logout);
 
@@ -720,8 +756,12 @@
   setInterval(drift, 60000);
   drift();
 
-  if (auth && auth.access_token) showPanel();
-  else showLogin();
+  if (auth && auth.access_token) {
+    showPanel();
+  } else {
+    showLogin();
+    prepareAuth();
+  }
 
   document.addEventListener('visibilitychange', function(){
     if (!document.hidden && auth) { syncWake(); poll(); }
