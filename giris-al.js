@@ -18,10 +18,23 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 
+/*
+ * Bu sabitler ve adres kurulumu, Claude Code 2.1.260'ın kendi kodundan birebir
+ * alındı (ikili içindeki yapılandırma bloğu ve yetkilendirme adresini kuran
+ * fonksiyon). Tahmin yok: Claude Code ne gönderiyorsa aynısı gönderiliyor.
+ */
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
+const AUTHORIZE_URL = 'https://claude.com/cai/oauth/authorize';   // claude.ai hesapları için
 const REDIRECT = 'https://platform.claude.com/oauth/code/callback';
-const SCOPES = 'user:profile user:inference user:sessions:claude_code user:mcp_servers';
-const TOKEN_URL = 'https://console.anthropic.com/v1/oauth/token';
+const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
+const SCOPES = [
+  'org:create_api_key',
+  'user:profile',
+  'user:inference',
+  'user:sessions:claude_code',
+  'user:mcp_servers',
+  'user:file_upload',
+];
 
 const LOG = path.join(__dirname, 'giris-log.txt');
 const OUT = path.join(__dirname, 'telefon-kodu.txt');
@@ -39,39 +52,21 @@ function b64url(buf) {
 }
 
 /**
- * Yetkilendirme adresini kurar.
- *
- * Anthropic'in beklediği biçim belgelenmiş değil ve zamanla değişiyor, bu yüzden
- * üç varyant üretiyoruz. Hepsi aynı dogrulayici ve state'i kullanır; hangisiyle
- * giris yapilirsa yapilsin donen kod gecerli olur.
- *
- *   kodGoster : "code=true" parametresi eklensin mi (kodu ekranda gosterme modu)
- *   artiAyrac : izinler "+" ile mi ayrilsin (Claude Code boyle yapiyor), yoksa %20 ile mi
+ * Yetkilendirme adresi — Claude Code'un kendi fonksiyonunun birebir karşılığı.
+ * Parametre sırası ve kodlama aynı olsun diye URL/searchParams kullanılıyor.
  */
-function authorizeUrl(challenge, state, secenek) {
-  const o = secenek || {};
-  const ayrac = o.artiAyrac ? '+' : '%20';
-  const scopeKodlu = SCOPES.split(' ').map(encodeURIComponent).join(ayrac);
-
-  const parcalar = [];
-  if (o.kodGoster) parcalar.push('code=true');
-  parcalar.push(
-    'client_id=' + encodeURIComponent(CLIENT_ID),
-    'response_type=code',
-    'redirect_uri=' + encodeURIComponent(REDIRECT),
-    'scope=' + scopeKodlu,
-    'code_challenge=' + challenge,
-    'code_challenge_method=S256',
-    'state=' + encodeURIComponent(state)
-  );
-  return 'https://claude.ai/oauth/authorize?' + parcalar.join('&');
+function authorizeUrl(challenge, state) {
+  const u = new URL(AUTHORIZE_URL);
+  u.searchParams.append('code', 'true');
+  u.searchParams.append('client_id', CLIENT_ID);
+  u.searchParams.append('response_type', 'code');
+  u.searchParams.append('redirect_uri', REDIRECT);
+  u.searchParams.append('scope', SCOPES.join(' '));
+  u.searchParams.append('code_challenge', challenge);
+  u.searchParams.append('code_challenge_method', 'S256');
+  u.searchParams.append('state', state);
+  return u.toString();
 }
-
-const VARYANTLAR = [
-  { ad: 'Claude Code ile birebir aynı', secenek: { artiAyrac: true } },
-  { ad: 'Kodu ekranda gösterme parametresiyle', secenek: { artiAyrac: true, kodGoster: true } },
-  { ad: 'Boşluklar %20 ile kodlanmış', secenek: { artiAyrac: false } },
-];
 
 function sor(soru) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -82,22 +77,17 @@ function sor(soru) {
   const verifier = b64url(crypto.randomBytes(32));
   const challenge = b64url(crypto.createHash('sha256').update(verifier).digest());
   const state = b64url(crypto.randomBytes(16));
-  const adresler = VARYANTLAR.map((v) => ({
-    ad: v.ad,
-    url: authorizeUrl(challenge, state, v.secenek),
-  }));
+  const url = authorizeUrl(challenge, state);
 
-  kaydet('scope=' + SCOPES + ' redirect=' + REDIRECT);
-  adresler.forEach((a, i) => kaydet('varyant ' + (i + 1) + ' (' + a.ad + '): ' + a.url));
+  kaydet('authorize=' + AUTHORIZE_URL);
+  kaydet('scope=' + SCOPES.join(' '));
+  kaydet('adres: ' + url);
 
   console.log('');
   console.log('  ADIM 1 — Tarayicida izin ver');
   console.log('  ------------------------------------------------------------');
-  console.log('  Tarayicida bir sayfa acilacak, uzerinde 3 bagant olacak.');
-  console.log('  SIRAYLA dene: 1. calismazsa geri gelip 2.yi, sonra 3.u tikla.');
-  console.log('');
-  console.log('  Calisan sayfada "Authorize" / "Izin ver" butonuna bas,');
-  console.log('  ekranda cikan KODU kopyala.');
+  console.log('  Tarayici acilip Claude onay sayfasina gidecek.');
+  console.log('  "Authorize" / "Izin ver" deyip ekranda cikan KODU kopyala.');
   console.log('');
   console.log('  Sayfa acilmazsa su dosyaya cift tikla:');
   console.log('  ' + ACICI);
@@ -111,17 +101,12 @@ function sor(soru) {
     '<!doctype html><meta charset="utf-8"><title>Claude girisi</title>' +
     '<body style="background:#000;color:#f5f3ef;font-family:system-ui;' +
     'max-width:640px;margin:0 auto;padding:48px 24px;line-height:1.6">' +
-    '<h2 style="font-weight:700">Claude girisi</h2>' +
-    '<p style="color:#8a8780">Asagidaki baglantilari <b style="color:#f5f3ef">sirayla</b> dene. ' +
-    'Ilki hata verirse bu sayfaya geri donup ikinciyi, sonra ucuncuyu tikla. ' +
-    'Hangisi acilirsa orada <b style="color:#f5f3ef">Authorize</b> deyip cikan kodu kopyala.</p>' +
-    adresler.map((a, i) =>
-      '<p style="margin:18px 0"><a href="' + kacir(a.url) + '" ' +
-      'style="color:#d97757;font-size:17px;font-weight:600">' +
-      (i + 1) + '. ' + a.ad + '</a></p>'
-    ).join('') +
-    '<p style="color:#55534e;font-size:13px;margin-top:32px">' +
-    'Ucu de ayni anahtari kullanir; hangisinden girersen gir kod gecerli olur.</p>'
+    '<meta http-equiv="refresh" content="1;url=' + kacir(url) + '">' +
+    '<h2 style="font-weight:700">Claude girisi aciliyor</h2>' +
+    '<p style="color:#8a8780">Yonlendirilmezsen asagidaki baglantiya tikla. ' +
+    'Acilan sayfada <b style="color:#f5f3ef">Authorize</b> deyip cikan kodu kopyala.</p>' +
+    '<p style="margin:22px 0"><a href="' + kacir(url) + '" ' +
+    'style="color:#d97757;font-size:17px;font-weight:600">Claude giris sayfasini ac</a></p>'
   );
   kaydet('acici dosya yazildi: ' + ACICI);
   if (!process.env.ACMA) {

@@ -402,33 +402,28 @@
       .then(function(h){ return { verifier: verifier, challenge: b64url(h) }; });
   }
 
-  // Dar küme yetmezse tanı bölümündeki alternatif bağlantı geniş kümeyi dener.
-  // org:create_api_key bilerek yok: Anthropic artık o izni tanımıyor ve
-  // isteği "Unknown scope" ile reddediyor.
+  // Claude Code 2.1.260'ın kendi kodundan alınan izin kümesi ve adres.
+  // Tanı bölümündeki alternatif, izinlerin dar hâlini dener.
+  var AUTHORIZE_URL = 'https://claude.com/cai/oauth/authorize';
+  var SCOPES_GENIS = 'org:create_api_key user:profile user:inference ' +
+                     'user:sessions:claude_code user:mcp_servers user:file_upload';
   var SCOPES_DAR   = 'user:profile user:inference';
-  var SCOPES_GENIS = 'user:profile user:inference user:sessions:claude_code user:mcp_servers';
 
   /**
-   * Yetkilendirme adresini elle kurar.
-   *
-   * URLSearchParams boşluğu "+" olarak kodluyor; OAuth sunucusu izin listesini
-   * boşlukla ayrılmış bekliyor ve "+" ile gelen değeri tek bir geçersiz izin
-   * adı sayıp isteği reddediyor. encodeURIComponent boşluğu %20 yapar.
+   * Yetkilendirme adresi — Claude Code'un kendi kurulumunun birebir karşılığı:
+   * aynı adres, aynı parametre sırası, URLSearchParams ile aynı kodlama.
    */
   function authorizeUrl(pk, state, scopes){
-    var params = [
-      ['code', 'true'],
-      ['client_id', CLIENT_ID],
-      ['response_type', 'code'],
-      ['redirect_uri', REDIRECT],
-      ['scope', scopes || SCOPES_DAR],
-      ['code_challenge', pk.challenge],
-      ['code_challenge_method', 'S256'],
-      ['state', state],
-    ];
-    return 'https://claude.ai/oauth/authorize?' + params.map(function(kv){
-      return kv[0] + '=' + encodeURIComponent(kv[1]);
-    }).join('&');
+    var u = new URL(AUTHORIZE_URL);
+    u.searchParams.append('code', 'true');
+    u.searchParams.append('client_id', CLIENT_ID);
+    u.searchParams.append('response_type', 'code');
+    u.searchParams.append('redirect_uri', REDIRECT);
+    u.searchParams.append('scope', scopes || SCOPES_GENIS);
+    u.searchParams.append('code_challenge', pk.challenge);
+    u.searchParams.append('code_challenge_method', 'S256');
+    u.searchParams.append('state', state);
+    return u.toString();
   }
 
   function loginError(msg){
