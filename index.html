@@ -215,11 +215,15 @@
   </div>
 
   <details id="diag">
-    <summary>Sayfa açılmıyor mu?</summary>
+    <summary>Giriş sayfası hata veriyorsa</summary>
     <p class="note" style="margin:10px 0">
-      Butona bastığında yeni sekme açılmıyorsa tarayıcı engellemiş olabilir.
-      Aşağıdaki adresi kopyalayıp doğrudan aç — aynı işi görür.
-      Claude bir hata gösterirse o hatayı aynen bildir.
+      Claude sayfası isteği reddediyorsa (örn. <i>invalid request format</i>)
+      alternatif izin kümesiyle dene — kodu yine yukarıdaki kutuya yapıştırırsın.
+    </p>
+    <a class="cta ghost" id="altBtn" target="_blank" rel="noopener">Alternatif izinlerle dene</a>
+    <p class="note" style="margin:14px 0 8px">
+      Yeni sekme hiç açılmıyorsa tarayıcı engelliyor olabilir; aşağıdaki adresi
+      kopyalayıp doğrudan aç. Claude başka bir hata gösterirse hatayı aynen bildir.
     </p>
     <code id="rawUrl"></code>
   </details>
@@ -357,17 +361,31 @@
       .then(function(h){ return { verifier: verifier, challenge: b64url(h) }; });
   }
 
-  function authorizeUrl(pk, state){
-    var u = new URL('https://claude.ai/oauth/authorize');
-    u.searchParams.set('code', 'true');
-    u.searchParams.set('client_id', CLIENT_ID);
-    u.searchParams.set('response_type', 'code');
-    u.searchParams.set('redirect_uri', REDIRECT);
-    u.searchParams.set('scope', 'user:profile user:inference');
-    u.searchParams.set('code_challenge', pk.challenge);
-    u.searchParams.set('code_challenge_method', 'S256');
-    u.searchParams.set('state', state);
-    return u.toString();
+  // Dar küme yetmezse tanı bölümündeki alternatif bağlantı geniş kümeyi dener
+  var SCOPES_DAR   = 'user:profile user:inference';
+  var SCOPES_GENIS = 'org:create_api_key user:profile user:inference';
+
+  /**
+   * Yetkilendirme adresini elle kurar.
+   *
+   * URLSearchParams boşluğu "+" olarak kodluyor; OAuth sunucusu izin listesini
+   * boşlukla ayrılmış bekliyor ve "+" ile gelen değeri tek bir geçersiz izin
+   * adı sayıp isteği reddediyor. encodeURIComponent boşluğu %20 yapar.
+   */
+  function authorizeUrl(pk, state, scopes){
+    var params = [
+      ['code', 'true'],
+      ['client_id', CLIENT_ID],
+      ['response_type', 'code'],
+      ['redirect_uri', REDIRECT],
+      ['scope', scopes || SCOPES_DAR],
+      ['code_challenge', pk.challenge],
+      ['code_challenge_method', 'S256'],
+      ['state', state],
+    ];
+    return 'https://claude.ai/oauth/authorize?' + params.map(function(kv){
+      return kv[0] + '=' + encodeURIComponent(kv[1]);
+    }).join('&');
   }
 
   function loginError(msg){
@@ -411,10 +429,13 @@
     return makePkce().then(function(pk){
       var state = b64url(crypto.getRandomValues(new Uint8Array(16)));
       save(PK_KEY, { verifier: pk.verifier, state: state });
-      var url = authorizeUrl(pk, state);
+      var url = authorizeUrl(pk, state, SCOPES_DAR);
       $('startBtn').href = url;
       $('againBtn').href = url;
       $('rawUrl').textContent = url;
+      // Aynı doğrulayıcı, geniş izin kümesi — iki bağlantıdan hangisi açılırsa
+      // yapıştırılan kod yine geçerli olur
+      $('altBtn').href = authorizeUrl(pk, state, SCOPES_GENIS);
     }).catch(function(){
       loginError('Tarayıcı, güvenli bağlantı gerektiren bir özelliği engelledi. ' +
                  'Sayfayı https:// ile açtığından emin ol.');
