@@ -24,8 +24,10 @@ const { spawn } = require('child_process');
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
 const AUTHORIZE_URL = 'https://claude.com/cai/oauth/authorize';
 const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
+// Bu hesabin Claude Code kimliginde bulunan izinlerin birebir aynisi.
+// org:create_api_key bilerek yok: Pro hesaba verilmiyor, istenirse onay adimi
+// "Invalid request format" ile basarisiz oluyor.
 const SCOPES = [
-  'org:create_api_key',
   'user:profile',
   'user:inference',
   'user:sessions:claude_code',
