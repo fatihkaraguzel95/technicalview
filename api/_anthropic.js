@@ -77,7 +77,34 @@ async function exchange(body) {
   return { status: r.status, json };
 }
 
+/**
+ * Üst sunucunun hatasını olduğu gibi yüzeye çıkarır.
+ *
+ * Genel bir "Anthropic 403" mesajı teşhis için işe yaramıyordu: yetki kapsamı
+ * sorunu mu, güvenlik duvarı engeli mi, ayırt edilemiyordu. Gövdenin bir
+ * bölümünü de taşıyoruz.
+ */
+async function upstreamError(res, r) {
+  let govde = '';
+  try { govde = (await r.text()).slice(0, 300).replace(/\s+/g, ' ').trim(); } catch {}
+
+  const ipuclari = {
+    403: 'Yetki reddedildi. Giriş kodunun kapsamı yetersiz olabilir ya da ' +
+         'Anthropic bu sunucudan gelen isteği engelliyor olabilir.',
+    429: 'Çok fazla istek. Bir süre bekle.',
+  };
+
+  return send(res, 502, {
+    ok: false,
+    code: 'UPSTREAM_' + r.status,
+    status: r.status,
+    detail: govde,
+    message: (ipuclari[r.status] || 'Anthropic isteği reddetti.') +
+             ' [HTTP ' + r.status + (govde ? ' — ' + govde : '') + ']',
+  });
+}
+
 module.exports = {
   CLIENT_ID, USAGE_URL, PROFILE_URL,
-  authHeaders, bearer, send, shapeUsage, exchange,
+  authHeaders, bearer, send, shapeUsage, exchange, upstreamError,
 };

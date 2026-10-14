@@ -1,6 +1,6 @@
 /** Giriş yapan hesabın adı/e-postası ve plan bilgisi. Girişten sonra bir kez çağrılır. */
 
-const { PROFILE_URL, authHeaders, bearer, send } = require('./_anthropic');
+const { PROFILE_URL, authHeaders, bearer, send, upstreamError } = require('./_anthropic');
 
 module.exports = async (req, res) => {
   const token = bearer(req);
@@ -11,7 +11,7 @@ module.exports = async (req, res) => {
     if (r.status === 401) {
       return send(res, 401, { ok: false, code: 'TOKEN_EXPIRED', message: 'Oturum süresi doldu.' });
     }
-    if (!r.ok) return send(res, 502, { ok: false, code: 'UPSTREAM', message: 'Anthropic ' + r.status });
+    if (!r.ok) return upstreamError(res, r);
 
     const j = await r.json();
     const acc = j.account || {};

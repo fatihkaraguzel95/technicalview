@@ -1,6 +1,6 @@
 /** Kullanım yüzdelerini döndürür. Token istekle gelir, saklanmaz. */
 
-const { USAGE_URL, authHeaders, bearer, send, shapeUsage } = require('./_anthropic');
+const { USAGE_URL, authHeaders, bearer, send, shapeUsage, upstreamError } = require('./_anthropic');
 
 module.exports = async (req, res) => {
   const token = bearer(req);
@@ -12,10 +12,7 @@ module.exports = async (req, res) => {
     if (r.status === 401) {
       return send(res, 401, { ok: false, code: 'TOKEN_EXPIRED', message: 'Oturum süresi doldu.' });
     }
-    if (!r.ok) {
-      const detail = (await r.text()).slice(0, 200);
-      return send(res, 502, { ok: false, code: 'UPSTREAM', message: 'Anthropic ' + r.status + ': ' + detail });
-    }
+    if (!r.ok) return upstreamError(res, r);
 
     return send(res, 200, shapeUsage(await r.json()));
   } catch (e) {
