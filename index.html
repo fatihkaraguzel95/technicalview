@@ -156,11 +156,24 @@
   }
   .cta:active{filter:brightness(.92)}
   .cta.ghost{background:transparent; color:var(--dim); border:1px solid var(--line); font-weight:600; font-size:13px; padding:12px}
-  #codeIn{
+  #codeIn, #tokIn{
     width:100%; background:#17171a; border:1px solid var(--line); color:var(--txt);
     font:inherit; font-size:15px; padding:14px; border-radius:12px; margin:0;
   }
-  #codeIn:focus{outline:none; border-color:color-mix(in srgb,var(--accent) 50%,transparent)}
+  #codeIn:focus, #tokIn:focus{
+    outline:none; border-color:color-mix(in srgb,var(--accent) 50%,transparent);
+  }
+  code.inline{
+    background:#17171a; border:1px solid var(--line); border-radius:6px;
+    padding:2px 6px; font-size:12.5px; color:var(--accent); white-space:nowrap;
+  }
+  #oauthBox{border-top:1px solid var(--line); padding-top:6px; margin-top:4px}
+  #oauthBox>summary{
+    font-size:12.5px; color:var(--dim); cursor:pointer; padding:10px 0; list-style:none;
+  }
+  #oauthBox>summary::-webkit-details-marker{display:none}
+  #oauthBox>summary::before{content:"› "}
+  #oauthBox[open]>summary::before{content:"⌄ "}
   #loginErr{
     color:#f2c4c0; background:color-mix(in srgb,var(--bad) 14%,var(--card));
     border:1px solid color-mix(in srgb,var(--bad) 40%,transparent);
@@ -188,6 +201,24 @@
 <div id="login" class="hidden">
   <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="#d97757" class="markG"></g></svg>
   <h1>Claude Limit</h1>
+
+  <div id="tokenBox">
+    <p style="margin-bottom:16px">
+      Bilgisayarında bir kez <code class="inline">claude setup-token</code> çalıştır,
+      verdiği uzun kodu buraya yapıştır. Hangi hesabın kodu yapıştırılırsa
+      <b>o hesabın</b> verileri gösterilir.
+    </p>
+    <input id="tokIn" type="text" inputmode="text" autocomplete="off"
+           autocapitalize="off" spellcheck="false" placeholder="sk-ant-oat01-...">
+    <button class="cta" id="tokBtn" style="margin-top:12px">Giriş yap</button>
+    <p class="note" style="margin-top:14px">
+      Kod yalnızca bu cihazın tarayıcısında saklanır, sunucuya kaydedilmez.
+      Çıkış yapmak onu silmeye eşdeğerdir.
+    </p>
+  </div>
+
+  <details id="oauthBox">
+    <summary>Bunun yerine Claude hesabıyla giriş yap</summary>
 
   <div id="step1">
     <p style="margin-bottom:18px">
@@ -226,6 +257,8 @@
       kopyalayıp doğrudan aç. Claude başka bir hata gösterirse hatayı aynen bildir.
     </p>
     <code id="rawUrl"></code>
+  </details>
+
   </details>
 
   <div id="loginErr" class="hidden"></div>
@@ -476,6 +509,47 @@
       .catch(function(){
         $('doneBtn').textContent = 'Giriş yap';
         $('doneBtn').disabled = false;
+        loginError('Sunucuya ulaşılamadı. Bağlantını kontrol edip tekrar dene.');
+      });
+  }
+
+  /**
+   * `claude setup-token` ile üretilen uzun ömürlü kodla giriş.
+   *
+   * Kod /api/me ile doğrulanır; geçerliyse saklanır. Bu kodların süresi uzun
+   * olduğu için yenileme gerekmez (refresh_token yok).
+   */
+  function loginWithToken(){
+    var tok = ($('tokIn').value || '').trim();
+    if (!tok) return loginError('Önce kodu yapıştır.');
+
+    loginError(null);
+    $('tokBtn').textContent = 'Kontrol ediliyor...';
+    $('tokBtn').disabled = true;
+
+    var bitir = function(){
+      $('tokBtn').textContent = 'Giriş yap';
+      $('tokBtn').disabled = false;
+    };
+
+    fetch('/api/me', { headers: { Authorization: 'Bearer ' + tok } })
+      .then(function(r){ return r.json().then(function(j){ return { r: r, j: j }; }); })
+      .then(function(res){
+        bitir();
+        if (!res.j.ok) {
+          return loginError(res.r.status === 401
+            ? 'Bu kod kabul edilmedi. Süresi dolmuş olabilir — bilgisayarda ' +
+              'claude setup-token komutunu tekrar çalıştırıp yeni kod al.'
+            : (res.j.message || 'Kod doğrulanamadı.'));
+        }
+        auth = { access_token: tok, refresh_token: null, expires_at: null };
+        save(AUTH_KEY, auth);
+        save(ME_KEY, res.j);
+        $('tokIn').value = '';
+        showPanel();
+      })
+      .catch(function(){
+        bitir();
         loginError('Sunucuya ulaşılamadı. Bağlantını kontrol edip tekrar dene.');
       });
   }
@@ -765,6 +839,8 @@
     $('step2').classList.remove('hidden');
   });
   $('doneBtn').addEventListener('click', finishLogin);
+  $('tokBtn').addEventListener('click', loginWithToken);
+  $('tokIn').addEventListener('keydown', function(e){ if (e.key === 'Enter') loginWithToken(); });
   $('codeIn').addEventListener('keydown', function(e){ if (e.key === 'Enter') finishLogin(); });
   $('outBtn').addEventListener('click', logout);
 

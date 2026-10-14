@@ -33,17 +33,27 @@ olarak servis edilir, `api/*.js` dosyaları sunucusuz fonksiyona dönüşür.
 > temizle (**Settings → General → Root Directory** → boş bırak / `./`), sonra
 > **Deployments → Redeploy**. Dolu kalırsa `404 NOT_FOUND` alırsın.
 
-### 2. Telefona kur
+### 2. Giriş kodunu üret
+
+Bilgisayarında bir kez:
+
+```
+claude setup-token
+```
+
+Verdiği uzun kodu (`sk-ant-oat01-...`) kopyala. Bu kod uzun ömürlüdür; bir kez üretip
+bütün cihazlarda kullanabilirsin.
+
+### 3. Telefona kur
 
 1. Çıkan adresi (`https://....vercel.app`) Chrome'da aç
-2. **Claude ile giriş yap** → Claude'un onay sayfasında izin ver → çıkan kodu kopyala
-3. Kodu panele yapıştır
-4. Menü (⋮) → **Ana ekrana ekle**
+2. Kodu yapıştır → **Giriş yap**
+3. Menü (⋮) → **Ana ekrana ekle**
 
 HTTPS olduğu için uygulama tam ekran açılır ve sayfa ekranı açık tutabilir.
 Başka cihaz eklemek için aynı adımlar — her cihaz kendi oturumunu tutar.
 
-### 3. Ekranı sürekli açık tutma
+### 4. Ekranı sürekli açık tutma
 
 Panel ekranı kendisi açık tutmaya çalışır (Wake Lock). Daha sağlam yöntem telefon ayarı:
 
@@ -86,16 +96,21 @@ OLED ekranda iz bırakmasını önlemek için.
 
 ## Bilinmesi gerekenler
 
-- **Giriş, Claude Code'un OAuth istemcisini kullanıyor.** Anthropic üçüncü taraf
-  uygulamalar için açık bir "Claude ile giriş yap" hizmeti sunmuyor; başka yolu yok.
-  Resmî olarak desteklenen bir kullanım değil, Anthropic istediği an kapatabilir.
-- **Bu panelden giriş yapmak, bilgisayarındaki Claude Code oturumunu etkileyebilir.**
-  Normalde her giriş bağımsız bir oturum açar, ama garanti edemem. Etkilenirse çözüm
-  basit: bilgisayarda `claude` çalıştırıp `/login` ile tekrar gir.
 - **Token yalnızca "limitimi oku" yetkisiyle sınırlı değil.** Hesap adına Claude'a istek
-  atma yetkisi de içeriyor. Kendi kullanımın için sorun değil; bu yüzden adresi
+  atma yetkisi de içeriyor. Kendi kullanımın için sorun değil; bu yüzden kodu ve adresi
   başkalarına dağıtma.
-- Giriş kodunun ömrü kısadır. Kopyalayıp hemen yapıştır, gecikirse yeni kod al.
+- Kodun geçerliliği biterse panel girişe döner; `claude setup-token` ile yeni kod üretip
+  yapıştırman yeterli.
+
+### "Claude hesabıyla giriş" seçeneği
+
+Giriş ekranında, token yapıştırmaya alternatif olarak bir OAuth akışı da duruyor
+(katlanmış bölümde). Anthropic üçüncü taraf uygulamalar için açık bir "Claude ile giriş
+yap" hizmeti sunmadığından bu akış Claude Code'un OAuth istemcisini ödünç kullanıyor:
+resmî olarak desteklenen bir yol değil ve Anthropic istediği an davranışını
+değiştirebilir — nitekim geliştirme sırasında `org:create_api_key` izninin kaldırıldığı
+ve token ucunun `state` parametresini zorunlu tuttuğu ortaya çıktı. Çalışırsa telefondan
+bilgisayar olmadan giriş yapabilmeni sağlar; çalışmazsa token yöntemi her koşulda geçerli.
 
 ## Yerel geliştirme
 
